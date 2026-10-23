@@ -3,7 +3,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.routers import chat, speech
+from src.routers import chat, sessions, speech
 
 # Comma-separated list of browser origins allowed to call the API.
 CORS_ORIGINS = [
@@ -21,6 +21,7 @@ app.add_middleware(
 )
 app.include_router(chat.router)
 app.include_router(speech.router)
+app.include_router(sessions.router)
 
 
 @app.get("/health")

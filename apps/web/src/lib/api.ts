@@ -19,6 +19,9 @@ export interface ChatMessageResponse {
   intensity: number;
   animation_trigger: string;
   human_takeover_flag: boolean;
+  // Optional here so existing fixtures stay valid; the API always sends them.
+  session_id?: string;
+  ai_paused?: boolean;
 }
 
 export const API_URL =
