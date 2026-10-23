@@ -8,7 +8,7 @@ intake; a student counselor takes over high-priority sessions live.
 | Path | What |
 |---|---|
 | `apps/api` | FastAPI backend (chat + triage) |
-| `apps/web` | Next.js client and counselor dashboard (not started) |
+| `apps/web` | Next.js client: chat page today, counselor dashboard later ([README](apps/web/README.md)) |
 | `apps/mobile` | Expo client (not started) |
 | `packages` | Shared TS code (not started) |
 
@@ -22,6 +22,9 @@ pytest tests/test_triage_pipeline.py
 uvicorn src.main:app --reload   # docs at http://localhost:8000/docs
 ```
 
+Set `CORS_ORIGINS` (comma-separated) to change which browser origins may call
+the API; it defaults to `http://localhost:3000` for the web app.
+
 Or with Docker: `docker build -t clairvoyance-api apps/api && docker run -p 8000:8000 clairvoyance-api`.
 
 ```bash
@@ -30,6 +33,12 @@ curl -X POST localhost:8000/api/v1/chat/message \
 # {"text_response":"...","sentiment":"distressed","intensity":9,
 #  "animation_trigger":"concerned_lean_in","human_takeover_flag":true}
 ```
+
+## Web quickstart
+
+See [apps/web/README.md](apps/web/README.md) (PowerShell commands included).
+
+![Chat page](docs/web-chat.png)
 
 ## How triage works
 
