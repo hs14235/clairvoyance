@@ -106,3 +106,25 @@ def test_stub_is_deterministic():
 
 def test_health(client):
     assert client.get("/health").json() == {"status": "ok"}
+
+
+# --- CORS ---
+
+def test_cors_allows_local_web_app(client):
+    res = client.options(
+        URL,
+        headers={
+            "Origin": "http://localhost:3000",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+    assert res.status_code == 200
+    assert res.headers["access-control-allow-origin"] == "http://localhost:3000"
+
+
+def test_cors_rejects_unknown_origin(client):
+    res = client.post(
+        URL, json={"message": "hi"}, headers={"Origin": "https://evil.example"}
+    )
+    assert "access-control-allow-origin" not in res.headers
