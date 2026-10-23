@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -135,6 +135,14 @@ describe("Speak replies", () => {
     await userEvent.type(screen.getByLabelText("Message"), "again");
     await userEvent.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() => expect(speakMock).toHaveBeenCalledTimes(1));
-    expect(speakMock.mock.calls[0][0].text).toBe("That sounds like a lot.");
+    const utterance = speakMock.mock.calls[0][0];
+    expect(utterance.text).toBe("That sounds like a lot.");
+
+    // The avatar's mouth follows real playback, not a timer.
+    const avatar = screen.getByRole("img", { name: /avatar/i });
+    act(() => utterance.onstart());
+    expect(avatar.dataset.speaking).toBe("true");
+    act(() => utterance.onend());
+    expect(avatar.dataset.speaking).toBeUndefined();
   });
 });

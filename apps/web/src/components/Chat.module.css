@@ -19,6 +19,11 @@
   color: var(--alert-fg);
 }
 
+.stage {
+  flex: 0 0 auto;
+  height: clamp(140px, 32dvh, 300px);
+}
+
 .log {
   flex: 1;
   display: flex;

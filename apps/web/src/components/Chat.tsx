@@ -5,6 +5,8 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { ChatMessageResponse, sendChatMessage } from "@/lib/api";
 import { canSpeak, speak, stopSpeaking } from "@/lib/speech";
 import { useBrowserSupport } from "@/lib/useBrowserSupport";
+import type { AvatarState } from "@/lib/avatar";
+import Avatar from "./avatar/Avatar";
 import styles from "./Chat.module.css";
 import MicButton from "./MicButton";
 
@@ -24,6 +26,14 @@ export default function Chat() {
   const sessionId = useRef<string | null>(null);
   const nextId = useRef(0);
   const logEnd = useRef<HTMLDivElement>(null);
+  const [avatar, setAvatar] = useState<AvatarState>({
+    sentiment: "neutral",
+    intensity: 1,
+    speaking: false,
+  });
+  const speakTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  useEffect(() => () => clearTimeout(speakTimer.current), []);
 
   useEffect(() => {
     logEnd.current?.scrollIntoView?.({ behavior: "smooth" });
@@ -60,7 +70,26 @@ export default function Chat() {
         { id: nextId.current++, role: "assistant", reply },
       ]);
       if (reply.human_takeover_flag) setTakeover(true);
-      if (speakReplies) speak(reply.text_response);
+      setAvatar((prev) => ({
+        sentiment: reply.sentiment,
+        intensity: reply.intensity,
+        motion: reply.animation_trigger,
+        motionKey: (prev.motionKey ?? 0) + 1,
+        speaking: true,
+      }));
+      clearTimeout(speakTimer.current);
+      if (speakReplies) {
+        // Lip-sync to real speech playback.
+        speak(reply.text_response, (speaking) =>
+          setAvatar((prev) => ({ ...prev, speaking })),
+        );
+      } else {
+        // Silent mode: "speak" for roughly as long as the text takes to read.
+        speakTimer.current = setTimeout(
+          () => setAvatar((prev) => ({ ...prev, speaking: false })),
+          Math.min(8000, 600 + reply.text_response.length * 45),
+        );
+      }
     } catch {
       setError("Couldn't reach the server. Is the API running on port 8000?");
     } finally {
@@ -79,6 +108,10 @@ export default function Chat() {
           </span>
         </div>
       )}
+
+      <div className={styles.stage}>
+        <Avatar state={avatar} />
+      </div>
 
       <div className={styles.log} aria-live="polite">
         {entries.length === 0 && (
@@ -157,7 +190,10 @@ export default function Chat() {
             checked={speakReplies}
             onChange={(e) => {
               setSpeakReplies(e.target.checked);
-              if (!e.target.checked) stopSpeaking();
+              if (!e.target.checked) {
+                stopSpeaking();
+                setAvatar((prev) => ({ ...prev, speaking: false }));
+              }
             }}
           />
           Speak replies aloud
