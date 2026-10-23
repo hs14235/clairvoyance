@@ -38,7 +38,11 @@ def test_returns_full_payload(client):
     res = client.post(URL, json={"message": "I'm feeling anxious about exams"})
     assert res.status_code == 200
     body = res.json()
-    assert set(body) == {"text_response", "sentiment", "intensity", "animation_trigger", "human_takeover_flag"}
+    assert set(body) == {
+        "text_response", "sentiment", "intensity", "animation_trigger",
+        "human_takeover_flag", "session_id", "ai_paused",
+    }
+    assert body["ai_paused"] is False
     assert body["sentiment"] == "anxious"
     assert body["intensity"] == 4
     assert body["human_takeover_flag"] is False

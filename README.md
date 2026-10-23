@@ -7,8 +7,8 @@ intake; a student counselor takes over high-priority sessions live.
 
 | Path | What |
 |---|---|
-| `apps/api` | FastAPI backend (chat + triage) |
-| `apps/web` | Next.js client: chat page today, counselor dashboard later ([README](apps/web/README.md)) |
+| `apps/api` | FastAPI backend (chat, triage, session tracking) |
+| `apps/web` | Next.js client: chat page (`/`) and counselor dashboard (`/dashboard`) ([README](apps/web/README.md)) |
 | `apps/mobile` | Expo client (not started) |
 | `packages` | Shared TS code (not started) |
 
@@ -18,7 +18,7 @@ intake; a student counselor takes over high-priority sessions live.
 cd apps/api
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
-pytest tests/test_triage_pipeline.py
+pytest
 uvicorn src.main:app --reload   # docs at http://localhost:8000/docs
 ```
 
@@ -50,3 +50,35 @@ See [apps/web/README.md](apps/web/README.md) (PowerShell commands included).
    model never sets the flag itself.
 
 > The stub and keyword list are placeholders, not clinically validated.
+
+## Counselor dashboard
+
+![Counselor dashboard](docs/dashboard.png)
+
+The chat endpoint records every session (keyed by the `session_id` the client
+sends) with its message history, latest sentiment and intensity, peak
+intensity, and status:
+
+| Status | Meaning |
+|---|---|
+| `ai` | AI is replying, nothing flagged |
+| `flagged` | Triage asked for a human; AI still replying. Sticky once set. |
+| `counselor` | A counselor took over. The model is not called; the client gets a holding line and `ai_paused: true`. Crisis language still flags the session. |
+
+| Endpoint | What |
+|---|---|
+| `GET /api/v1/sessions` | Summaries, flagged first, then counselor, then AI; newest activity first in each |
+| `GET /api/v1/sessions/{id}` | Summary plus full transcript |
+| `POST /api/v1/sessions/{id}/takeover` | Pause the AI (idempotent) |
+| `POST /api/v1/sessions/{id}/release` | Hand back to the AI (idempotent) |
+
+Known gaps:
+
+- **No auth.** Anyone who can reach the API can read transcripts and take over
+  sessions. Needs counselor accounts before any real client data.
+- **In-memory store.** Sessions vanish on restart and aren't shared across
+  workers. PostgreSQL (history) and Redis (live state) replace
+  `services/session_store.py`.
+- **No counselor replies yet.** Takeover pauses the AI, but the counselor can't
+  message the client until a WebSocket channel exists. The dashboard polls
+  every 3 seconds for the same reason.
