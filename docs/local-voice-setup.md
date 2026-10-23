@@ -1,79 +1,109 @@
 # Run the full voice loop locally (Windows)
 
 Mic → `POST /api/v1/speech/transcribe` (faster-whisper) → `POST /api/v1/chat/message`
-(Qwen via Ollama, then triage rules) → reply bubble, optional spoken reply.
+(Qwen via Ollama, then triage rules) → reply bubble, avatar, optional spoken reply.
 
 Everything runs on your machine. No paid API, no data leaves the laptop.
 
-## 1. Install Ollama and pull Qwen (one time)
+## Quick start
+
+You need Python 3.11+ (`winget install --id Python.Python.3.12`), Node 20.9+, and Ollama:
 
 ```powershell
-winget install --id Ollama.Ollama
-# open a NEW terminal so `ollama` is on PATH; the server runs in the background
-ollama pull qwen2.5:3b
-curl.exe http://localhost:11434/v1/models   # should list qwen2.5:3b
+winget install --id Ollama.Ollama      # then open a NEW terminal
+.\scripts\start-api.ps1                # terminal 1: checks everything, then runs the API
+.\scripts\smoke-test.ps1               # terminal 2: speech -> Whisper -> Qwen, with timings
+cd apps/web; npm install; npm run dev  # terminal 2: web app on http://localhost:3000
 ```
 
-Which Qwen 2.5 size (download sizes from the Ollama library):
+`start-api.ps1` checks Python, installs packages, starts Ollama if it isn't
+running, pulls the model if it's missing, loads it into memory, and starts the
+API. Any failure stops with a red line saying what to do.
 
-| Tag | Download | Notes |
-|---|---|---|
-| `qwen2.5:1.5b` | ~1 GB | Fast on any laptop CPU, weaker JSON and tone |
-| `qwen2.5:3b` | ~1.9 GB | **Default.** Good balance on 8-16 GB RAM |
-| `qwen2.5:7b` | ~4.7 GB | Noticeably better replies; wants 16 GB RAM or a GPU |
+`smoke-test.ps1` makes Windows speak a sentence into a WAV file, sends it
+through Whisper and Qwen, and prints what was heard, Qwen's reply, and how long
+each step took. Run it before opening the browser so you know the backend works.
+Try `-Sentence "I feel hopeless and I can't go on"` to see a takeover.
 
-> License: the 3B weights use the Qwen Research License (non-commercial);
-> 1.5B and 7B are Apache 2.0. Fine for a demo; pick 7B or a hosted API before
-> anything commercial.
+If PowerShell blocks the scripts: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
 
-## 2. Start the API
+## Which Qwen model
 
-```powershell
-.\scripts\start-api.ps1                     # Qwen 2.5 3B + Whisper small
-.\scripts\start-api.ps1 -Model qwen2.5:7b   # bigger model
-.\scripts\start-api.ps1 -Stub               # no models (same as CI / Pages demo)
+The script picks **`qwen2.5:7b`** when the machine has 16 GB+ RAM and
+**`qwen2.5:1.5b`** otherwise. Override with `-Model`.
+
+| Tag | Download | Licence | Notes |
+|---|---|---|---|
+| `qwen2.5:1.5b` | ~1 GB | Apache 2.0 | Fast on any CPU. Replies are simpler; ratings are rougher |
+| `qwen2.5:3b` | ~1.9 GB | Qwen Research (non-commercial) | Middle ground; fine for a personal demo |
+| `qwen2.5:7b` | ~4.7 GB | Apache 2.0 | Noticeably better replies. On CPU expect several seconds per reply |
+
+The reply format is enforced with a JSON schema (Ollama's structured outputs),
+so even 1.5B can only produce valid sentiments, intensities and gestures. The
+API also sends the last 8 messages so Qwen remembers the conversation.
+
+## Speech-to-text
+
+Whisper `small` on CPU (int8) by default, English only (`-Language auto` to
+detect). The API starts loading it in the background at startup; the first run
+downloads ~0.5 GB from huggingface.co. `-WhisperModel base` is faster and less
+accurate; `medium` is slower and better.
+
+In the browser: tap 🎤, speak, tap ■ (recording stops by itself after 60 s).
+Tick **Speak replies aloud** to hear replies; the avatar's mouth follows the
+real speech. On Edge, the "Natural" voices sound best. The mic only works on
+`localhost` or HTTPS.
+
+## Is it working? `GET /api/v1/status`
+
+http://localhost:8000/api/v1/status reports both backends:
+
+```json
+{"llm": {"provider": "openai", "ok": true, "detail": "qwen2.5:7b at http://127.0.0.1:11434/v1"},
+ "stt": {"provider": "faster-whisper", "ok": true, "detail": "Whisper small loaded (cpu, int8)"}}
 ```
 
-The script creates `apps/api/.venv`, installs `requirements-voice.txt`, pulls the
-model, sets the env vars below and runs uvicorn on http://localhost:8000. The
-first voice message downloads the Whisper `small` model (roughly 0.5 GB) from
-Hugging Face and takes a while; later ones are a few seconds on CPU.
+If Qwen can't be used for a reply, the chat still answers with a canned line,
+the bubble says **Offline reply**, and the API terminal logs the reason. If the
+message had crisis language, the canned line is a crisis-safe one and the
+takeover still fires.
 
-If PowerShell blocks the script: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
+## Troubleshooting
 
-## 3. Start the web app
-
-```powershell
-cd apps/web
-npm install
-npm run dev
-```
-
-Open http://localhost:3000, tap 🎤, speak, tap ■. Tick **Speak replies aloud**
-to hear the reply (browser speech synthesis, no server needed). The mic only
-works on `localhost` or HTTPS; browsers block it on plain-HTTP LAN addresses.
+| You see | Fix |
+|---|---|
+| `Can't reach http://127.0.0.1:11434/v1. Is Ollama running?` | Open the Ollama app from the Start menu, or run `ollama serve` |
+| `Model 'qwen2.5:7b' isn't pulled. Run: ollama pull qwen2.5:7b` | Run that command (the script does it for you) |
+| `The model took longer than 120s` | First reply after a cold start loads the model. Retry, use a smaller model, or set `$env:LLM_TIMEOUT_SECONDS = "300"` |
+| `Speech-to-text isn't ready yet: Couldn't load Whisper...` | The download failed. Check your internet, then send another voice message (it retries) |
+| Transcripts in the wrong language | Keep the default `-Language en` |
+| `pip` fails building `av` | Python is older than 3.11. Install 3.12 and delete `apps/api/.venv` |
+| Hugging Face prints a "symlinks" warning | Harmless on Windows; the model still caches |
+| Mic button missing | Browser can't record, or the page isn't on `localhost`/HTTPS |
 
 ## Docker alternative
 
 `docker compose up --build` runs Ollama and the API (with faster-whisper) in
-containers, then `docker compose exec ollama ollama pull qwen2.5:3b` once.
-Run the web app with `npm run dev` as above. On Windows, Docker runs Ollama on
-CPU unless GPU passthrough is set up, so the native install above is usually
-faster.
+containers; then run `docker compose exec ollama ollama pull qwen2.5:1.5b`
+once. Run the web app with `npm run dev` as above. On Windows, Docker runs
+Ollama on CPU unless GPU passthrough is set up, so the native install above is
+usually faster.
 
 ## Configuration
 
 | Env var | Default | Meaning |
 |---|---|---|
 | `LLM_PROVIDER` | `stub` | `stub` (keyword stand-in) or `openai` (any OpenAI-compatible server) |
-| `LLM_BASE_URL` | `http://localhost:11434/v1` | Ollama's OpenAI-compatible endpoint |
-| `LLM_MODEL` | `qwen2.5:3b` | Model name on that server |
+| `LLM_BASE_URL` | `http://127.0.0.1:11434/v1` | Ollama's OpenAI-compatible endpoint |
+| `LLM_MODEL` | `qwen2.5:1.5b` | Model name on that server (`start-api.ps1` may pick 7b) |
 | `LLM_API_KEY` | none | Sent as `Bearer` token; Ollama ignores it |
-| `LLM_TIMEOUT_SECONDS` | `60` | Per-request timeout |
+| `LLM_TIMEOUT_SECONDS` | `120` | Per-request timeout |
+| `LLM_JSON_MODE` | `schema` | `schema` (JSON schema), `object` (JSON mode), `none`. A 400 on `schema` drops to `object` automatically |
 | `STT_PROVIDER` | `stub` | `stub` (fixed phrase) or `faster-whisper` |
 | `STT_MODEL` | `small` | Whisper size: `base`, `small`, `medium`, ... |
-| `STT_DEVICE` / `STT_COMPUTE_TYPE` | `cpu` / `int8` | `cuda` / `float16` on an NVIDIA GPU |
-| `STT_LANGUAGE` | auto | e.g. `en` to skip language detection |
+| `STT_DEVICE` / `STT_COMPUTE_TYPE` | `cpu` / `int8` | `cuda` / `float16` on an NVIDIA GPU with CUDA 12 + cuDNN 9 |
+| `STT_LANGUAGE` | `en` | `auto` to detect |
+| `STT_BEAM_SIZE` | `5` | `1` is faster, slightly less accurate |
 
 ### Switching to a hosted Qwen API later
 
@@ -89,10 +119,3 @@ $env:LLM_MODEL    = "<model id from the Model Studio list>"
 
 Check the current base URL and model ids in the Model Studio console; they
 are region-specific.
-
-## How failures behave
-
-- Model down, slow, or returns non-JSON: the API logs a warning and replies
-  with a neutral fallback line. Triage still runs on the user's text, so
-  crisis keywords still trigger takeover.
-- The model never sets `human_takeover_flag`; `utils/triage_rules.py` does.

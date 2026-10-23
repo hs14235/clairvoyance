@@ -35,6 +35,8 @@ class ChatMessageResponse(BaseModel):
     session_id: str
     # True once a counselor has taken over: text_response is a holding line, not AI output.
     ai_paused: bool = False
+    # True when the model couldn't be used and text_response is a canned line.
+    model_fallback: bool = False
 
 
 class MessageOut(BaseModel):

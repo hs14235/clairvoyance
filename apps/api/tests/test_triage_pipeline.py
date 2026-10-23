@@ -14,7 +14,7 @@ class FixedClient:
     def __init__(self, analysis: ModelAnalysis):
         self.analysis = analysis
 
-    async def analyze(self, message: str) -> ModelAnalysis:
+    async def analyze(self, message: str, history=()) -> ModelAnalysis:
         return self.analysis
 
 
@@ -40,7 +40,7 @@ def test_returns_full_payload(client):
     body = res.json()
     assert set(body) == {
         "text_response", "sentiment", "intensity", "animation_trigger",
-        "human_takeover_flag", "session_id", "ai_paused",
+        "human_takeover_flag", "session_id", "ai_paused", "model_fallback",
     }
     assert body["ai_paused"] is False
     assert body["sentiment"] == "anxious"

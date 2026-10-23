@@ -2,11 +2,27 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { transcribeAudio } from "@/lib/api";
+import { ApiError, transcribeAudio } from "@/lib/api";
+import { stopSpeaking } from "@/lib/speech";
 import { useBrowserSupport } from "@/lib/useBrowserSupport";
 import styles from "./Chat.module.css";
 
 type MicState = "idle" | "recording" | "transcribing";
+
+// Long enough for a thought, short enough to keep Whisper fast on CPU.
+export const MAX_RECORDING_MS = 60_000;
+// Shorter than this is almost always an accidental double tap.
+const MIN_RECORDING_MS = 400;
+
+function transcribeError(err: unknown): string {
+  if (err instanceof ApiError && err.status === 503) {
+    return `Speech-to-text isn't ready yet: ${err.detail ?? "the model is still loading"}`;
+  }
+  if (err instanceof ApiError && err.status === 422) {
+    return "Couldn't read that recording. Please try again.";
+  }
+  return "Couldn't transcribe the recording. Is the API running on port 8000?";
+}
 
 // Preferred first. Chrome/Firefox/Edge record webm/opus; Safari records mp4/aac.
 const MIME_TYPES = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"];
@@ -35,16 +51,22 @@ export default function MicButton({ disabled, onTranscript, onError }: Props) {
   const [state, setState] = useState<MicState>("idle");
   const supported = useBrowserSupport(micSupported);
   const recorder = useRef<MediaRecorder | null>(null);
+  const limitTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(
-    () => () => recorder.current?.stream.getTracks().forEach((t) => t.stop()),
+    () => () => {
+      clearTimeout(limitTimer.current);
+      recorder.current?.stream.getTracks().forEach((t) => t.stop());
+    },
     [],
   );
 
   async function start() {
     let stream: MediaStream;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
     } catch {
       onError("Microphone access was blocked. Allow it in the browser's site settings.");
       return;
@@ -52,15 +74,18 @@ export default function MicButton({ disabled, onTranscript, onError }: Props) {
     const mimeType = pickMimeType();
     const rec = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
     const chunks: Blob[] = [];
+    const startedAt = Date.now();
     rec.ondataavailable = (e) => {
       if (e.data.size > 0) chunks.push(e.data);
     };
     rec.onstop = async () => {
+      clearTimeout(limitTimer.current);
       stream.getTracks().forEach((t) => t.stop());
       recorder.current = null;
       const audio = new Blob(chunks, { type: rec.mimeType || mimeType || "audio/webm" });
-      if (audio.size === 0) {
+      if (audio.size === 0 || Date.now() - startedAt < MIN_RECORDING_MS) {
         setState("idle");
+        onError("That was very short. Tap the mic, speak, then tap again to send.");
         return;
       }
       setState("transcribing");
@@ -68,15 +93,20 @@ export default function MicButton({ disabled, onTranscript, onError }: Props) {
         const { text } = await transcribeAudio(audio);
         if (text.trim()) onTranscript(text.trim());
         else onError("I didn't catch that. Try again a little closer to the mic.");
-      } catch {
-        onError("Couldn't transcribe the recording. Is the API running on port 8000?");
+      } catch (err) {
+        onError(transcribeError(err));
       } finally {
         setState("idle");
       }
     };
+    // Don't record the avatar's own voice.
+    stopSpeaking();
     recorder.current = rec;
     rec.start();
     setState("recording");
+    limitTimer.current = setTimeout(() => {
+      if (rec.state === "recording") rec.stop();
+    }, MAX_RECORDING_MS);
   }
 
   function stop() {

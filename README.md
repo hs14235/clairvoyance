@@ -47,7 +47,8 @@ see [docs/local-voice-setup.md](docs/local-voice-setup.md). Short version:
 
 ```powershell
 winget install --id Ollama.Ollama
-.\scripts\start-api.ps1          # API with Qwen 2.5 3B + Whisper small
+.\scripts\start-api.ps1          # checks + starts the API with Qwen 2.5 and Whisper
+.\scripts\smoke-test.ps1         # second terminal: speech -> Whisper -> Qwen check
 cd apps/web; npm install; npm run dev
 ```
 
