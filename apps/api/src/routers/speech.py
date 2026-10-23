@@ -1,7 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 
 from src.schemas import TranscriptionResponse
-from src.services.speech_service import Transcriber, get_transcriber
+from src.services.speech_service import (
+    AudioDecodeError,
+    STTUnavailable,
+    Transcriber,
+    get_transcriber,
+)
 
 router = APIRouter(prefix="/api/v1/speech", tags=["speech"])
 
@@ -19,4 +24,10 @@ async def transcribe(
         raise HTTPException(status_code=422, detail="Empty audio upload")
     if len(data) > MAX_AUDIO_BYTES:
         raise HTTPException(status_code=413, detail="Audio upload too large")
-    return TranscriptionResponse(text=await stt.transcribe(data))
+    try:
+        text = await stt.transcribe(data)
+    except AudioDecodeError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except STTUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return TranscriptionResponse(text=text)

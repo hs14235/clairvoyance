@@ -49,9 +49,16 @@ function json(body: unknown) {
 
 beforeEach(() => stopTrack.mockClear());
 
+// Pretend the user spoke for a few seconds before tapping stop.
+function laterBy(ms: number) {
+  const now = Date.now();
+  vi.spyOn(Date, "now").mockReturnValue(now + ms);
+}
+
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
   Reflect.deleteProperty(navigator, "mediaDevices");
 });
 
@@ -73,6 +80,7 @@ describe("MicButton in Chat", () => {
     await userEvent.click(screen.getByRole("button", { name: "Record voice message" }));
     const stop = screen.getByRole("button", { name: "Stop recording" });
     expect(stop.getAttribute("aria-pressed")).toBe("true");
+    laterBy(3000);
     await userEvent.click(stop);
 
     expect(await screen.findByText("That sounds like a lot.")).toBeTruthy();
@@ -106,6 +114,7 @@ describe("MicButton in Chat", () => {
     render(<Chat />);
 
     await userEvent.click(screen.getByRole("button", { name: "Record voice message" }));
+    laterBy(3000);
     await userEvent.click(screen.getByRole("button", { name: "Stop recording" }));
 
     expect(await screen.findByText(/couldn't transcribe/i)).toBeTruthy();
@@ -113,10 +122,66 @@ describe("MicButton in Chat", () => {
   });
 });
 
+describe("MicButton edge cases", () => {
+  it("shows the server's reason when speech-to-text isn't ready", async () => {
+    stubMic();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValueOnce(
+        new Response(JSON.stringify({ detail: "Couldn't load Whisper 'small'" }), { status: 503 }),
+      ),
+    );
+    render(<Chat />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Record voice message" }));
+    laterBy(3000);
+    await userEvent.click(screen.getByRole("button", { name: "Stop recording" }));
+
+    expect(await screen.findByText(/isn't ready yet: Couldn't load Whisper 'small'/)).toBeTruthy();
+  });
+
+  it("ignores an accidental double tap without calling the API", async () => {
+    stubMic();
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    render(<Chat />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Record voice message" }));
+    await userEvent.click(screen.getByRole("button", { name: "Stop recording" }));
+
+    expect(await screen.findByText(/that was very short/i)).toBeTruthy();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("stops the avatar talking before recording", async () => {
+    stubMic();
+    const cancel = vi.fn();
+    vi.stubGlobal("speechSynthesis", { speak: vi.fn(), cancel, getVoices: () => [] });
+    render(<Chat />);
+    cancel.mockClear();
+
+    await userEvent.click(screen.getByRole("button", { name: "Record voice message" }));
+
+    expect(cancel).toHaveBeenCalled();
+  });
+});
+
+describe("Fallback replies", () => {
+  it("marks a canned reply so the tester knows Qwen wasn't used", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(json({ ...reply, model_fallback: true })));
+    render(<Chat />);
+
+    await userEvent.type(screen.getByLabelText("Message"), "hi");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(await screen.findByText(/offline reply/i)).toBeTruthy();
+  });
+});
+
 describe("Speak replies", () => {
   it("reads the reply aloud only when the toggle is on", async () => {
     const speakMock = vi.fn();
-    vi.stubGlobal("speechSynthesis", { speak: speakMock, cancel: vi.fn() });
+    vi.stubGlobal("speechSynthesis", { speak: speakMock, cancel: vi.fn(), getVoices: () => [] });
     vi.stubGlobal(
       "SpeechSynthesisUtterance",
       class {

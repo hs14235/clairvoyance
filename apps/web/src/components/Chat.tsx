@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useRef, useState } from "react";
 
-import { ChatMessageResponse, sendChatMessage } from "@/lib/api";
+import { ApiError, ChatMessageResponse, sendChatMessage } from "@/lib/api";
 import { canSpeak, speak, stopSpeaking } from "@/lib/speech";
 import { useBrowserSupport } from "@/lib/useBrowserSupport";
 import type { AvatarState } from "@/lib/avatar";
@@ -90,8 +90,12 @@ export default function Chat() {
           Math.min(8000, 600 + reply.text_response.length * 45),
         );
       }
-    } catch {
-      setError("Couldn't reach the server. Is the API running on port 8000?");
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? `The server had a problem (${err.message}).`
+          : "Couldn't reach the server. Is the API running on port 8000?",
+      );
     } finally {
       setPending(false);
     }
@@ -130,6 +134,12 @@ export default function Chat() {
               className={`${styles.bubble} ${styles.assistant}`}
             >
               <p>{entry.reply.text_response}</p>
+              {entry.reply.model_fallback && (
+                <p className={styles.fallback}>
+                  Offline reply: the AI model couldn&apos;t be reached. Check the
+                  API terminal or http://localhost:8000/api/v1/status.
+                </p>
+              )}
               <div className={styles.meta}>
                 <span className={styles.badge} data-sentiment={entry.reply.sentiment}>
                   {entry.reply.sentiment}

@@ -17,7 +17,7 @@ class CountingClient:
         self.calls = 0
         self.intensity = intensity
 
-    async def analyze(self, message: str) -> ModelAnalysis:
+    async def analyze(self, message: str, history=()) -> ModelAnalysis:
         self.calls += 1
         return ModelAnalysis("ai reply", "anxious", self.intensity, "supportive_nod")
 

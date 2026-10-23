@@ -22,6 +22,27 @@ export interface ChatMessageResponse {
   // Optional here so existing fixtures stay valid; the API always sends them.
   session_id?: string;
   ai_paused?: boolean;
+  // True when the model was unavailable and text_response is a canned line.
+  model_fallback?: boolean;
+}
+
+/** Non-2xx response. `detail` is FastAPI's error message when it sent one. */
+export class ApiError extends Error {
+  constructor(
+    public status: number,
+    public detail?: string,
+  ) {
+    super(detail ? `API returned ${status}: ${detail}` : `API returned ${status}`);
+  }
+}
+
+async function errorFrom(res: Response): Promise<ApiError> {
+  try {
+    const body = await res.json();
+    return new ApiError(res.status, typeof body?.detail === "string" ? body.detail : undefined);
+  } catch {
+    return new ApiError(res.status);
+  }
 }
 
 export const API_URL =
@@ -38,7 +59,7 @@ export async function sendChatMessage(
     signal,
   });
   if (!res.ok) {
-    throw new Error(`API returned ${res.status}`);
+    throw await errorFrom(res);
   }
   return res.json();
 }
@@ -61,7 +82,7 @@ export async function transcribeAudio(
     signal,
   });
   if (!res.ok) {
-    throw new Error(`API returned ${res.status}`);
+    throw await errorFrom(res);
   }
   return res.json();
 }

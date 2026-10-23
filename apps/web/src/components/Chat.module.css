@@ -177,3 +177,9 @@
   font-size: 0.85rem;
   color: var(--muted);
 }
+
+.fallback {
+  margin-top: 6px;
+  font-size: 0.8rem;
+  color: var(--alert-fg);
+}
