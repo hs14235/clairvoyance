@@ -61,3 +61,7 @@ class SessionSummary(BaseModel):
 
 class SessionDetail(SessionSummary):
     messages: list[MessageOut]
+
+
+class TranscriptionResponse(BaseModel):
+    text: str

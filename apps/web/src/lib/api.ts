@@ -42,3 +42,26 @@ export async function sendChatMessage(
   }
   return res.json();
 }
+
+export interface TranscriptionResponse {
+  text: string;
+}
+
+export async function transcribeAudio(
+  audio: Blob,
+  signal?: AbortSignal,
+): Promise<TranscriptionResponse> {
+  const ext = audio.type.includes("mp4") ? "mp4" : audio.type.includes("ogg") ? "ogg" : "webm";
+  const form = new FormData();
+  form.append("audio", audio, `speech.${ext}`);
+  // No Content-Type header: the browser sets the multipart boundary itself.
+  const res = await fetch(`${API_URL}/api/v1/speech/transcribe`, {
+    method: "POST",
+    body: form,
+    signal,
+  });
+  if (!res.ok) {
+    throw new Error(`API returned ${res.status}`);
+  }
+  return res.json();
+}

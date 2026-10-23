@@ -3,7 +3,8 @@
 Next.js client for Clairvoyance. Today it is a single chat page that calls
 `POST /api/v1/chat/message` and shows the reply, the sentiment, the intensity,
 a takeover banner when the API sets `human_takeover_flag`, and an avatar that
-reacts to each reply (see [Avatar](#avatar)).
+reacts to each reply (see [Avatar](#avatar)). Messages can be typed or
+spoken (mic button); see [local voice setup](../../docs/local-voice-setup.md).
 
 `/dashboard` is the counselor view: sessions with flagged ones first, the
 transcript of the selected session, and a Take over / Hand back button. It polls
@@ -54,7 +55,10 @@ npm run build
 | `src/app/page.tsx` | Page shell |
 | `src/components/Chat.tsx` | Chat UI and state (client component) |
 | `src/components/Chat.test.tsx` | Vitest + Testing Library tests, `fetch` mocked |
+| `src/components/MicButton.tsx` | Tap-to-record mic; uploads audio to `/api/v1/speech/transcribe` |
+| `src/components/MicButton.test.tsx` | Voice flow tests, `MediaRecorder` and `fetch` mocked |
 | `src/lib/api.ts` | Typed client; types mirror `apps/api/src/schemas.py` |
+| `src/lib/speech.ts` | "Speak replies aloud" via browser speech synthesis |
 | `src/app/dashboard/page.tsx` | Counselor dashboard route |
 | `src/components/Dashboard.tsx` | Session list, transcript, takeover toggle (client component) |
 | `src/lib/sessions.ts` | Typed client for `/api/v1/sessions` |
@@ -63,7 +67,7 @@ npm run build
 
 The chat page shows an avatar that reacts to each reply: `sentiment` and
 `intensity` set its expression, `animation_trigger` plays a gesture, and it
-lip-flaps while "speaking". Open http://localhost:3000/avatar-lab to try every
+lip-flaps while "speaking" (synced to real speech when "Speak replies aloud" is on). Open http://localhost:3000/avatar-lab to try every
 sentiment, intensity, trigger and parameter by hand, or send a message through
 the API and watch the avatar react.
 

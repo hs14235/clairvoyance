@@ -149,3 +149,31 @@
   overflow: hidden;
   clip: rect(0 0 0 0);
 }
+
+.composer .mic {
+  padding: 0 14px;
+  background: var(--surface);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+}
+
+.composer .mic[data-state="recording"] {
+  background: var(--alert-bg);
+  border-color: var(--alert-border);
+  color: var(--alert-fg);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}

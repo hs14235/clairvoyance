@@ -1,0 +1,26 @@
+# Full local loop: API (real Qwen via Ollama + faster-whisper) and Ollama.
+# Run the web app with `npm run dev` in apps/web. See docs/local-voice-setup.md.
+services:
+  ollama:
+    image: ollama/ollama
+    ports: ["11434:11434"]
+    volumes: [ollama:/root/.ollama]
+
+  api:
+    build:
+      context: apps/api
+      args: { VOICE: "1" }
+    ports: ["8000:8000"]
+    environment:
+      LLM_PROVIDER: openai
+      LLM_BASE_URL: http://ollama:11434/v1
+      LLM_MODEL: ${LLM_MODEL:-qwen2.5:3b}
+      STT_PROVIDER: faster-whisper
+      STT_MODEL: ${STT_MODEL:-small}
+      CORS_ORIGINS: http://localhost:3000
+    volumes: [hf-cache:/root/.cache/huggingface]  # keep the Whisper download
+    depends_on: [ollama]
+
+volumes:
+  ollama:
+  hf-cache:

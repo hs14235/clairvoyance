@@ -1,0 +1,5 @@
+# Optional: real speech-to-text. Not installed in CI.
+-r requirements.txt
+faster-whisper==1.2.1
+# av 19 dropped an argument faster-whisper 1.2.1 passes to av.open().
+av==18.1.0
