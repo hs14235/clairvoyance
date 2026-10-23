@@ -5,6 +5,10 @@ Next.js client for Clairvoyance. Today it is a single chat page that calls
 a takeover banner when the API sets `human_takeover_flag`, and an avatar that
 reacts to each reply (see [Avatar](#avatar)).
 
+`/dashboard` is the counselor view: sessions with flagged ones first, the
+transcript of the selected session, and a Take over / Hand back button. It polls
+the API every 3 seconds. No login yet (see the root README's known gaps).
+
 ![Chat page](../../docs/web-chat.png)
 
 ## Run it locally (Windows PowerShell)
@@ -27,7 +31,7 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000.
+Open http://localhost:3000 for the chat and http://localhost:3000/dashboard for the counselor view.
 
 The API URL defaults to `http://localhost:8000`. To point elsewhere, copy
 `.env.example` to `.env.local` and change `NEXT_PUBLIC_API_URL`. The API only
@@ -51,6 +55,9 @@ npm run build
 | `src/components/Chat.tsx` | Chat UI and state (client component) |
 | `src/components/Chat.test.tsx` | Vitest + Testing Library tests, `fetch` mocked |
 | `src/lib/api.ts` | Typed client; types mirror `apps/api/src/schemas.py` |
+| `src/app/dashboard/page.tsx` | Counselor dashboard route |
+| `src/components/Dashboard.tsx` | Session list, transcript, takeover toggle (client component) |
+| `src/lib/sessions.ts` | Typed client for `/api/v1/sessions` |
 
 ## Avatar
 
