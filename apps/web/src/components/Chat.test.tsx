@@ -56,6 +56,22 @@ describe("Chat", () => {
     expect(typeof body.session_id).toBe("string");
   });
 
+  it("drives the avatar from the reply's sentiment and animation trigger", async () => {
+    mockFetch(reply({ sentiment: "sad", intensity: 6, animation_trigger: "soft_smile" }));
+    render(<Chat />);
+
+    const avatar = screen.getByRole("img", { name: /avatar/i });
+    expect(avatar.dataset.sentiment).toBe("neutral");
+
+    await send("I've been feeling down");
+    await screen.findByText("I hear you.");
+
+    expect(avatar.dataset.sentiment).toBe("sad");
+    expect(avatar.dataset.intensity).toBe("6");
+    expect(avatar.dataset.motion).toBe("soft_smile");
+    expect(avatar.dataset.speaking).toBe("true");
+  });
+
   it("reuses the same session id across messages", async () => {
     const fetchMock = mockFetch(reply(), reply({ text_response: "Go on." }));
     render(<Chat />);
