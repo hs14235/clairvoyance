@@ -2,7 +2,8 @@
 
 Next.js client for Clairvoyance. Today it is a single chat page that calls
 `POST /api/v1/chat/message` and shows the reply, the sentiment, the intensity,
-and a takeover banner when the API sets `human_takeover_flag`. The Live2D
+and a takeover banner when the API sets `human_takeover_flag`. Messages can be
+typed or spoken (mic button); see [local voice setup](../../docs/local-voice-setup.md). The Live2D
 avatar and the counselor dashboard come later.
 
 ![Chat page](../../docs/web-chat.png)
@@ -50,4 +51,7 @@ npm run build
 | `src/app/page.tsx` | Page shell |
 | `src/components/Chat.tsx` | Chat UI and state (client component) |
 | `src/components/Chat.test.tsx` | Vitest + Testing Library tests, `fetch` mocked |
+| `src/components/MicButton.tsx` | Tap-to-record mic; uploads audio to `/api/v1/speech/transcribe` |
+| `src/components/MicButton.test.tsx` | Voice flow tests, `MediaRecorder` and `fetch` mocked |
 | `src/lib/api.ts` | Typed client; types mirror `apps/api/src/schemas.py` |
+| `src/lib/speech.ts` | "Speak replies aloud" via browser speech synthesis |

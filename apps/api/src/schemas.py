@@ -25,3 +25,7 @@ class ChatMessageResponse(BaseModel):
     intensity: int = Field(ge=1, le=10)
     animation_trigger: str
     human_takeover_flag: bool
+
+
+class TranscriptionResponse(BaseModel):
+    text: str

@@ -3,7 +3,10 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 
 import { ChatMessageResponse, sendChatMessage } from "@/lib/api";
+import { canSpeak, speak, stopSpeaking } from "@/lib/speech";
+import { useBrowserSupport } from "@/lib/useBrowserSupport";
 import styles from "./Chat.module.css";
+import MicButton from "./MicButton";
 
 type Entry =
   | { id: number; role: "user"; text: string }
@@ -16,6 +19,8 @@ export default function Chat() {
   const [error, setError] = useState<string | null>(null);
   // Once any reply flags takeover, the whole session stays flagged.
   const [takeover, setTakeover] = useState(false);
+  const [speakReplies, setSpeakReplies] = useState(false);
+  const ttsAvailable = useBrowserSupport(canSpeak);
   const sessionId = useRef<string | null>(null);
   const nextId = useRef(0);
   const logEnd = useRef<HTMLDivElement>(null);
@@ -24,9 +29,16 @@ export default function Chat() {
     logEnd.current?.scrollIntoView?.({ behavior: "smooth" });
   }, [entries, pending]);
 
+  useEffect(() => stopSpeaking, []);
+
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const message = draft.trim();
+    await sendText(draft);
+  }
+
+  // Shared by typed and spoken messages.
+  async function sendText(text: string) {
+    const message = text.trim();
     if (!message || pending) return;
 
     sessionId.current ??= crypto.randomUUID();
@@ -48,6 +60,7 @@ export default function Chat() {
         { id: nextId.current++, role: "assistant", reply },
       ]);
       if (reply.human_takeover_flag) setTakeover(true);
+      if (speakReplies) speak(reply.text_response);
     } catch {
       setError("Couldn't reach the server. Is the API running on port 8000?");
     } finally {
@@ -127,10 +140,29 @@ export default function Chat() {
           maxLength={4000}
           autoComplete="off"
         />
+        <MicButton
+          disabled={pending}
+          onTranscript={sendText}
+          onError={setError}
+        />
         <button type="submit" disabled={pending || !draft.trim()}>
           Send
         </button>
       </form>
+
+      {ttsAvailable && (
+        <label className={styles.toggle}>
+          <input
+            type="checkbox"
+            checked={speakReplies}
+            onChange={(e) => {
+              setSpeakReplies(e.target.checked);
+              if (!e.target.checked) stopSpeaking();
+            }}
+          />
+          Speak replies aloud
+        </label>
+      )}
     </div>
   );
 }
